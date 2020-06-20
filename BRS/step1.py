@@ -21,7 +21,7 @@ def save_var(month, region):
         "filename_master = 'Master.xlsx' \n",
         "sheet_cost = 'BRS' \n",
         "sheet_truck_cap = 'Truck' \n",
-        "filename_summary = 'Summary/"+month+".xlsx' \n",
+        "filename_summary  = 'Summary/"+month+".xlsx' \n",
         "sheet_summary = 'Summary Sheet' \n",
         "summary_copy_path_local = 'Summary/"+month+'_'+region+".xlsx' \n",
         "summary_copy_path_drive = 'C:/Users/rastogi.l/OneDrive - Procter and Gamble/Desktop/Main/Power BI Input/"+month+'_'+region+".xlsx' \n", 
@@ -30,55 +30,70 @@ def save_var(month, region):
     f.writelines(L) 
     f.close()
 
+if __name__ == "__main__":
 
-month = input('Enter Month: ')
-region = input('Enter Region: ')
-print('\nStep 1: Initiating process')
-save_var(month, region)
+    month = input('Enter Month: ')
+    region = input('Enter Region: ')
+    print('\nStep 1: Initiating process')
+    save_var(month, region)
 
-parcel_sites = set()
-Psheet = pd.read_excel('Master.xlsx','Parcel').values.ravel()
-[parcel_sites.add(x) for x in Psheet];
+    parcel_locations = set()
+    parcels = pd.read_excel('Master.xlsx','Parcel Rates').values
+    [parcel_locations.add(r[1].split(' ')[0].upper()) for r in parcels];
 
-parcel_locations = set()
-site = pd.read_excel('Master.xlsx','Site').values
-[parcel_locations.add(r[3].split(' ')[0].upper()) for r in site if r[0] in parcel_sites];
+    change_name = dict()
+    BRSname = pd.read_excel('Master.xlsx','BRS name').values
+    for r in BRSname:
+        change_name[r[0]]=r[1]
 
-Master_SKU = pd.read_excel("Master.xlsx", 'Master SKU')
-cm = Master_SKU.columns.tolist()
-Master_SKU = Master_SKU[[cm[0],cm[2],cm[9],cm[10]]]
-cm = Master_SKU.columns.tolist()
+    Master_SKU = pd.read_excel("Master.xlsx", 'Master SKU')
+    cm = Master_SKU.columns.tolist()
+    Master_SKU = Master_SKU[[cm[0],cm[2],cm[9],cm[10]]]
+    cm = Master_SKU.columns.tolist()
 
-stn_path = 'STNs/'+month+'/' 
-STN = pd.DataFrame([])
-STN_parcel = pd.DataFrame([])
-files = os.listdir(stn_path)
+    stn_path = 'STNs/'+month+'/' 
+    STN = pd.DataFrame([])
+    STN_parcel = pd.DataFrame([])
+    files = os.listdir(stn_path)
 
 
-for f in files:
-    
-    stn = pd.read_excel(stn_path+f)
-    c = stn.columns.tolist()
-    stn = stn[[c[0],c[2],c[6],c[7],c[9],c[12]]]
-    
-    t=stn[['TOLOCATION']].values.ravel().tolist()
-    t = [x.upper() for x in t]
-    df = pd.DataFrame(t)
-    stn[['TOLOCATION']]=df 
-    
-    isparcel = False
-    for r in range(1,100,5):
-    	if stn['TOLOCATION'][r].split(' ')[0] in parcel_locations:
-    		isparcel = True
+    for f in files:
+        
+        stn = pd.read_excel(stn_path+f)
+        c = stn.columns.tolist()
+        stn = stn[[c[0],c[2],c[6],c[7],c[9],c[12]]]
+        t=stn[['TOLOCATION']].values.ravel().tolist()
+        
+        for i in range(len(t)):
+            if t[i] in change_name.keys():
+                t[i] = change_name[t[i]]
+            t[i]=t[i].upper()
 
-    if isparcel:
-        stn = stn[['TOLOCATION','LocTfrDate','Case']]
+        df = pd.DataFrame(t)
+        stn[['TOLOCATION']]=df 
+        
+        val = stn.values
+        stn_mr = []
+        stn_par = []
+        
+        for r in val:
+            if r[5].split(' ')[0] in parcel_locations:
+                stn_par.append(r)
+            else:
+                stn_mr.append(r)
+        
+        stn_mr = pd.DataFrame(stn_mr, columns=stn.columns.tolist())
+        stn_par = pd.DataFrame(stn_par, columns=stn.columns.tolist())
+        
+        #for parcel sites
+        stn = stn_par[['TOLOCATION','LocTfrDate','Case']]
         if len(STN_parcel.values.tolist())==0:
             STN_parcel = stn
         else:
             STN_parcel = STN_parcel.append(stn, ignore_index=True)
-        
-    else:
+            
+        #for milk run sites
+        stn = stn_mr
         stn = pd.merge(stn, Master_SKU[[cm[1],cm[2],cm[3]]],left_on='Product Name',right_on='Item_Des',how = 'left')
         stn = pd.merge(stn, Master_SKU[[cm[0],cm[2],cm[3]]],left_on='Product Code',right_on='Mas_Pcode', how = 'left')
         stn['Weight'] = np.where(stn['Weight_x'].isna(), stn['Weight_y'], stn['Weight_x'])
@@ -101,9 +116,8 @@ for f in files:
         else:
             STN = STN.append(stn, ignore_index=True)
 
-make_pivot_table(STN, month)
-make_parcel_cost_table(STN_parcel, month)    
+    make_pivot_table(STN, month)
+    make_parcel_cost_table(STN_parcel, month)    
 
-
-os.system('python optimizer.py')
-os.system('python summary.py')
+    os.system('python optimizer.py')
+    os.system('python summary.py')
