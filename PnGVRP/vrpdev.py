@@ -12,10 +12,10 @@ from pulp import *
 # demand_w[i] = weight demand of ith branch
 # demand_v[i] = volume demand of ith branch 
 
-Dataset = 'DP15'
-maxSeconds = 1000
-output = 'output15.xlsx'
-outputtxt = 'output15.txt'
+Dataset = 'DP10'
+maxSeconds = 15
+output = 'output10.xlsx'
+outputtxt = 'output10.txt'
 demandFile = Dataset+'/demand.xlsx'
 truckFile = Dataset+'/TruckCap.xlsx'
 costFile = Dataset+'/cost.xlsx'
@@ -76,13 +76,15 @@ if __name__ == "__main__":
         cost.append(Cost)
         
     Demand = pd.read_excel(demandFile)
-    br = [i.split(' ')[0] for i in Demand.index[1:]]
+    cnames = Demand.columns
+
+    br = [i.split(' ')[0] for i in Demand[cnames[0]][1:].tolist()]
     Demand = Demand.values
     d_w = {}
     d_v = {}
     for i in range(len(br)):
-        d_w[br[i]] = Demand[i+1][0]
-        d_v[br[i]] = Demand[i+1][1]
+        d_w[br[i]] = Demand[i+1][1]
+        d_v[br[i]] = Demand[i+1][2]
 
     # demand_w[i] = weight demand, demand_v[i] = volume demand of ith branch 
     demand_w = [0]
